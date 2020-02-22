@@ -4,8 +4,7 @@ const onlyRegex = /(describe|context|it)(\.only)/g
 const skipRegex = /(describe|context|it)(\.skip)/g
 const modifiableRunnableRegex = /(describe|context|it)(?=[ (])/
 
-const getLineText = (editor, selection) => {
-  const startLine = selection.start.line
+const getLineText = (editor, startLine) => {
   const range = editor.document.lineAt(startLine).range
   return editor.document.getText(range)
 }
@@ -25,27 +24,43 @@ const editEachSelection = (run) => {
 
 const addToSelections = (textToAdd) => () => {
   return editEachSelection((editor, edit, selection) => {
-    const text = getLineText(editor, selection)
-    const match = text.match(modifiableRunnableRegex)
+    let startLine = selection.start.line
+    let match
+    let text
+
+    while (startLine >= 0) {
+      text = getLineText(editor, startLine)
+      match = text.match(modifiableRunnableRegex)
+      if (match) break
+      startLine--
+    }
 
     if (!match) return
 
     const matchingWord = match[1]
     const index = text.indexOf(matchingWord) + matchingWord.length
 
-    const position = new Position(selection.start.line, index)
+    const position = new Position(startLine, index)
     edit.insert(position, textToAdd)
   })
 }
 
 const removeFromSelections = (textToRemove) => () => {
   editEachSelection((editor, edit, selection) => {
-    const text = getLineText(editor, selection)
-    const index = text.indexOf(textToRemove)
+    let startLine = selection.start.line
+    let text
+    let index
+    while (startLine >= 0) {
+      text = getLineText(editor, startLine)
+      index = text.indexOf(textToRemove)
+      if (index >= 0) break
+      startLine--
+    }
+
     if (index < 0) return
 
-    const start = new Position(selection.start.line, index)
-    const end = new Position(selection.start.line, index + textToRemove.length)
+    const start = new Position(startLine, index)
+    const end = new Position(startLine, index + textToRemove.length)
     const range = new Range(start, end)
     edit.delete(range)
   })
